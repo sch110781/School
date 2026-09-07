@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل حضور المعلمين - إدخال</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        h2, h3 { text-align: center; color: #2c3e50; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }
+        select, input, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        input[readonly] { background-color: #eef2f7; cursor: not-allowed; }
+        button { background: #27ae60; color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 15px; }
+        button:hover { background: #219150; }
+        .alert-success { background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; text-align: center; margin-top: 15px; display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 14px; }
+        th { background: #34495e; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>تسجيل حضور المعلم</h2>
+    
+    <div class="form-group">
+        <label>التاريخ:</label>
+        <input type="date" id="date" onchange="updateDayAndFilter()">
+    </div>
+
+    <div class="form-group">
+        <label>اليوم:</label>
+        <input type="text" id="day" readonly>
+    </div>
+
+    <div class="form-group">
+        <label>اسم المشرف (المُدخل):</label>
+        <input type="text" id="observer" placeholder="اكتب اسمك هنا" oninput="updateDayAndFilter()">
+    </div>
+
+    <div class="form-group">
+        <label>الخلية:</label>
+        <select id="cell">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>الحصة:</label>
+        <select id="period">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>اسم المعلم:</label>
+        <select id="teacher">
+            <option>أحمد هزازي</option>
+            <option>جبهان الشمري</option>
+            <option>حسن العيدروس</option>
+            <option>زيد الهيلي</option>
+            <option>سامر الفهمي</option>
+            <option>سعود الخماش</option>
+            <option>سلطان المالكي</option>
+            <option>سلمان الحربي</option>
+            <option>صالح القرني</option>
+            <option>طارق الحارثي</option>
+            <option>عبدالاله الغامدي</option>
+            <option>عبدالعزيز السبيعي</option>
+            <option>عبدالله الدوسري </option>
+            <option>عبدالله الحارثي</option>
+            <option>عثمان الفارس</option>
+            <option>علي الأسمري</option>
+            <option>فهد الزومان</option>
+            <option>فهد الحارثي</option>
+            <option>فيصل الشهري</option>
+            <option>ماجد المطيري</option>
+            <option>مبارك الوقداني</option>
+            <option>محمد بن داود</option>
+            <option>محمد الفراج</option>
+            <option>محمد النصار</option>
+            <option>محمد العمري</option>
+            <option>محمد السبيعي</option>
+            <option>محمد الغامدي</option>
+            <option>مشبب الأحمري</option>
+            <option>موسى البعداني</option>
+            <option>وليد السلمي</option>
+            <option>وليد الأمير</option>
+
+
+
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>الحالة:</label>
+        <select id="status">
+            <option value="حضر">حضر</option>
+            <option value="لم يحضر">لم يحضر</option>
+        </select>
+    </div>
+
+    <button onclick="saveData()">تسجيل البيانات</button>
+    <div id="successMsg" class="alert-success">تم تسجيل البيانات بنجاح!</div>
+
+    <hr style="margin-top: 30px; border: 0; border-top: 1px solid #eee;">
+
+    <h3>إدخالاتك لهذا اليوم</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>الخلية</th>
+                <th>الحصة</th>
+                <th>المعلم</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody id="myTodayRecords"></tbody>
+    </table>
+</div>
+
+<script>
+    // ضع بيانات مشروعك هنا بين العلامات
+    const firebaseConfig = {
+        apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+        databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
+        projectId: "school1-29236"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // إعدادات التشغيل عند فتح الصفحة
+    document.getElementById('date').valueAsDate = new Date();
+    
+    const savedObserver = localStorage.getItem('observer_name');
+    if (savedObserver) {
+        document.getElementById('observer').value = savedObserver;
+    }
+
+    function updateDayAndFilter() {
+        // تحديث اسم اليوم تلقائياً
+        const dateVal = document.getElementById('date').value;
+        if (dateVal) {
+            const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+            const parts = dateVal.split('-');
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            document.getElementById('day').value = days[d.getDay()];
+        }
+
+        // حفظ اسم المشرف محلياً
+        const obs = document.getElementById('observer').value.trim();
+        if (obs) {
+            localStorage.setItem('observer_name', obs);
+        }
+    }
+
+    // تشغيل التحديد لأول مرة
+    updateDayAndFilter();
+
+    // دالة حفظ البيانات المباشرة
+    function saveData() {
+        const observerName = document.getElementById('observer').value.trim();
+        if (!observerName) {
+            alert('يرجى إدخال اسم المشرف أولاً');
+            return;
+        }
+
+        const record = {
+            date: document.getElementById('date').value,
+            day: document.getElementById('day').value,
+            observer: observerName,
+            cell: document.getElementById('cell').value,
+            period: document.getElementById('period').value,
+            teacher: document.getElementById('teacher').value,
+            status: document.getElementById('status').value,
+            timestamp: Date.now()
+        };
+
+        database.ref('attendance').push(record)
+            .then(() => {
+                const msg = document.getElementById('successMsg');
+                msg.style.display = 'block';
+                setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            })
+            .catch((error) => {
+                alert('خطأ أثناء الحفظ: ' + error.message);
+            });
+    }
+
+    // التحديث المباشر واللحظي لجدول المشرف المخصص
+    database.ref('attendance').on('value', (snapshot) => {
+        const tableBody = document.getElementById('myTodayRecords');
+        tableBody.innerHTML = '';
+        
+        const currentObserver = document.getElementById('observer').value.trim();
+        const currentDate = document.getElementById('date').value;
+
+        if (!currentObserver || !currentDate) return;
+
+        snapshot.forEach((childSnapshot) => {
+            const data = childSnapshot.val();
+            // تصفية العرض: يظهر للمراقب فقط ما سجله بنفسه وفي اليوم المحدد
+            if (data.observer === currentObserver && data.date === currentDate) {
+                const row = `<tr>
+                    <td>${data.cell}</td>
+                    <td>${data.period}</td>
+                    <td>${data.teacher}</td>
+                    <td>${data.status}</td>
+                </tr>`;
+                tableBody.innerHTML = row + tableBody.innerHTML;
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

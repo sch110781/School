@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة المشرف - متابعة حضور المعلمين</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        h2, h3 { text-align: center; color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #34495e; color: white; }
+        .stats-table th { background: #2980b9; }
+        .badge-present { background: #27ae60; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .badge-absent { background: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>لوحة تحكم المشرف - المتابعة اللحظية</h2>
+
+    <h3>إحصائيات المعلمين</h3>
+    <table class="stats-table">
+        <thead>
+            <tr>
+                <th>اسم المعلم</th>
+                <th>إجمالي مرات الحضور</th>
+                <th>إجمالي مرات الغياب</th>
+            </tr>
+        </thead>
+        <tbody id="statsTableBody"></tbody>
+    </table>
+
+    <h3>سجل الإدخالات المباشر (جميع المراقبين)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>اليوم</th>
+                <th>المراقب</th>
+                <th>الخلية</th>
+                <th>الحصة</th>
+                <th>المعلم</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody id="recordsTableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+        databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
+        projectId: "school1-29236"
+    };
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const database = firebase.database();
+
+    database.ref('attendance').on('value', function(snapshot) {
+        const recordsTableBody = document.getElementById('recordsTableBody');
+        const statsTableBody = document.getElementById('statsTableBody');
+        
+        recordsTableBody.innerHTML = '';
+        statsTableBody.innerHTML = '';
+
+        if (!snapshot.exists()) {
+            recordsTableBody.innerHTML = '<tr><td colspan="7">لا توجد بيانات مسجلة حتى الآن</td></tr>';
+            return;
+        }
+
+        const teacherStats = {};
+
+        snapshot.forEach(function(childSnapshot) {
+            const data = childSnapshot.val();
+
+            if (!teacherStats[data.teacher]) {
+                teacherStats[data.teacher] = { present: 0, absent: 0 };
+            }
+            if (data.status === 'حضر') {
+                teacherStats[data.teacher].present++;
+            } else {
+                teacherStats[data.teacher].absent++;
+            }
+
+            const statusBadge = data.status === 'حضر' 
+                ? '<span class="badge-present">حضر</span>' 
+                : '<span class="badge-absent">لم يحضر</span>';
+
+            const row = '<tr>' +
+                '<td>' + (data.date || '-') + '</td>' +
+                '<td>' + (data.day || '-') + '</td>' +
+                '<td>' + (data.observer || '-') + '</td>' +
+                '<td>' + (data.cell || '-') + '</td>' +
+                '<td>' + (data.period || '-') + '</td>' +
+                '<td>' + (data.teacher || '-') + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+            '</tr>';
+            
+            recordsTableBody.innerHTML = row + recordsTableBody.innerHTML;
+        });
+
+        for (const teacher in teacherStats) {
+            const statRow = '<tr>' +
+                '<td><strong>' + teacher + '</strong></td>' +
+                '<td><span style="color: #27ae60; font-weight: bold;">' + teacherStats[teacher].present + '</span></td>' +
+                '<td><span style="color: #e74c3c; font-weight: bold;">' + teacherStats[teacher].absent + '</span></td>' +
+            '</tr>';
+            statsTableBody.innerHTML += statRow;
+        }
+    });
+</script>
+
+</body>
+</html>
