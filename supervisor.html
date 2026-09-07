@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الوكيل - متابعة حضور المعلمين</title>
+    <title>لوحة المشرف - متابعة حضور المعلمين</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
@@ -30,12 +30,25 @@
             margin: 0 auto 20px auto;
         }
         .btn-delete:hover { background: #c0392b; }
+
+        .filter-container {
+            background: #eef2f7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .filter-container label { font-weight: bold; color: #2c3e50; }
+        .filter-container select { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>لوحة تحكم الوكيل - المتابعة اللحظية</h2>
+    <h2>لوحة تحكم المشرف - المتابعة اللحظية</h2>
 
     <!-- زر التصفير -->
     <button class="btn-delete" onclick="clearAllData()">🗑️ مسح جميع البيانات والإحصائيات</button>
@@ -52,7 +65,21 @@
         <tbody id="statsTableBody"></tbody>
     </table>
 
-    <h3>سجل الإدخالات المباشر (جميع المشرفين)</h3>
+    <h3>سجل الإدخالات المباشر</h3>
+    
+    <!-- فلتر تصنيف الخلايا -->
+    <div class="filter-container">
+        <label for="cellFilter">تصفية حسب الخلية:</label>
+        <select id="cellFilter" onchange="renderData()">
+            <option value="all">جميع الخلايا</option>
+            <option value="1">الخلية 1</option>
+            <option value="2">الخلية 2</option>
+            <option value="3">الخلية 3</option>
+            <option value="4">الخلية 4</option>
+            <option value="5">الخلية 5</option>
+        </select>
+    </div>
+
     <table>
         <thead>
             <tr>
@@ -81,23 +108,33 @@
     }
     const database = firebase.database();
 
+    let globalSnapshot = null;
+
+    // الاستماع للبيانات وحفظ النسخة للفلترة اللحظية
     database.ref('attendance').on('value', function(snapshot) {
+        globalSnapshot = snapshot;
+        renderData();
+    });
+
+    function renderData() {
         const recordsTableBody = document.getElementById('recordsTableBody');
         const statsTableBody = document.getElementById('statsTableBody');
+        const selectedCell = document.getElementById('cellFilter').value;
         
         recordsTableBody.innerHTML = '';
         statsTableBody.innerHTML = '';
 
-        if (!snapshot.exists()) {
+        if (!globalSnapshot || !globalSnapshot.exists()) {
             recordsTableBody.innerHTML = '<tr><td colspan="7">لا توجد بيانات مسجلة حتى الآن</td></tr>';
             return;
         }
 
         const teacherStats = {};
 
-        snapshot.forEach(function(childSnapshot) {
+        globalSnapshot.forEach(function(childSnapshot) {
             const data = childSnapshot.val();
 
+            // حساب الإحصائيات الشاملة لكل المعلمين
             if (!teacherStats[data.teacher]) {
                 teacherStats[data.teacher] = { present: 0, absent: 0 };
             }
@@ -107,23 +144,31 @@
                 teacherStats[data.teacher].absent++;
             }
 
-            const statusBadge = data.status === 'حضر' 
-                ? '<span class="badge-present">حضر</span>' 
-                : '<span class="badge-absent">لم يحضر</span>';
+            // تطبيق فلتر الخلية على الجدول المباشر
+            if (selectedCell === 'all' || String(data.cell) === selectedCell) {
+                const statusBadge = data.status === 'حضر' 
+                    ? '<span class="badge-present">حضر</span>' 
+                    : '<span class="badge-absent">لم يحضر</span>';
 
-            const row = '<tr>' +
-                '<td>' + (data.date || '-') + '</td>' +
-                '<td>' + (data.day || '-') + '</td>' +
-                '<td>' + (data.observer || '-') + '</td>' +
-                '<td>' + (data.cell || '-') + '</td>' +
-                '<td>' + (data.period || '-') + '</td>' +
-                '<td>' + (data.teacher || '-') + '</td>' +
-                '<td>' + statusBadge + '</td>' +
-            '</tr>';
-            
-            recordsTableBody.innerHTML = row + recordsTableBody.innerHTML;
+                const row = '<tr>' +
+                    '<td>' + (data.date || '-') + '</td>' +
+                    '<td>' + (data.day || '-') + '</td>' +
+                    '<td>' + (data.observer || '-') + '</td>' +
+                    '<td>' + (data.cell || '-') + '</td>' +
+                    '<td>' + (data.period || '-') + '</td>' +
+                    '<td>' + (data.teacher || '-') + '</td>' +
+                    '<td>' + statusBadge + '</td>' +
+                '</tr>';
+                
+                recordsTableBody.innerHTML = row + recordsTableBody.innerHTML;
+            }
         });
 
+        if (recordsTableBody.innerHTML === '') {
+            recordsTableBody.innerHTML = '<tr><td colspan="7">لا توجد إدخالات لهذه الخلية حتى الآن</td></tr>';
+        }
+
+        // عرض جدول إحصائيات المعلمين
         for (const teacher in teacherStats) {
             const statRow = '<tr>' +
                 '<td><strong>' + teacher + '</strong></td>' +
@@ -132,9 +177,9 @@
             '</tr>';
             statsTableBody.innerHTML += statRow;
         }
-    });
+    }
 
-    // دالة تصفير المسح الكلي
+    // دالة التصفير
     function clearAllData() {
         if (confirm('هل أنت تأكد من رغبتك في مسح كافة السجلات والإحصائيات؟ لا يمكن التراجع عن هذه الخطوة.')) {
             database.ref('attendance').remove()
