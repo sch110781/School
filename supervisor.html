@@ -3,20 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم الوكيل - متابعة حضور المعلمين</title>
+    <title>لوحة الوكيل - متابعة حضور المعلمين</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .container { max-width: 1150px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         h2, h3 { text-align: center; color: #2c3e50; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
         th { background: #34495e; color: white; }
         .stats-table th { background: #2980b9; }
-        .badge-present { background: #27ae60; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-        .badge-absent { background: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; color: white; display: inline-block; font-size: 12px; }
+        .badge-present { background: #27ae60; }
+        .badge-absent { background: #e74c3c; }
+        .badge-late { background: #e67e22; }
+        .badge-permission { background: #3498db; }
+
         .btn-delete {
             background: #e74c3c;
             color: white;
@@ -30,6 +34,17 @@
             margin: 0 auto 20px auto;
         }
         .btn-delete:hover { background: #c0392b; }
+
+        .btn-delete-row {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-delete-row:hover { background: #cc0000; }
 
         .filter-container {
             background: #eef2f7;
@@ -48,9 +63,9 @@
 <body>
 
 <div class="container">
-    <h2>لوحة تحكم الوكيل - المتابعة اللحظية</h2>
+    <h2>لوحة تحكم المشرف - المتابعة اللحظية</h2>
 
-    <!-- زر التصفير -->
+    <!-- زر التصفير الكلي -->
     <button class="btn-delete" onclick="clearAllData()">🗑️ مسح جميع البيانات والإحصائيات</button>
 
     <h3>إحصائيات المعلمين</h3>
@@ -58,8 +73,12 @@
         <thead>
             <tr>
                 <th>اسم المعلم</th>
-                <th>إجمالي مرات الحضور</th>
-                <th>إجمالي مرات الغياب</th>
+                <th>حضر</th>
+                <th>لم يحضر</th>
+                <th>تأخير 15د</th>
+                <th>تأخير 20د</th>
+                <th>تأخير 30د</th>
+                <th>مستأذن</th>
             </tr>
         </thead>
         <tbody id="statsTableBody"></tbody>
@@ -85,11 +104,14 @@
             <tr>
                 <th>التاريخ</th>
                 <th>اليوم</th>
-                <th>المراقب</th>
+                <th>المشرف</th>
                 <th>الخلية</th>
                 <th>الحصة</th>
+                <th>الصف</th>
+                <th>الفصل</th>
                 <th>المعلم</th>
                 <th>الحالة</th>
+                <th>إجراء</th>
             </tr>
         </thead>
         <tbody id="recordsTableBody"></tbody>
@@ -110,7 +132,6 @@
 
     let globalSnapshot = null;
 
-    // الاستماع للبيانات وحفظ النسخة للفلترة اللحظية
     database.ref('attendance').on('value', function(snapshot) {
         globalSnapshot = snapshot;
         renderData();
@@ -125,30 +146,41 @@
         statsTableBody.innerHTML = '';
 
         if (!globalSnapshot || !globalSnapshot.exists()) {
-            recordsTableBody.innerHTML = '<tr><td colspan="7">لا توجد بيانات مسجلة حتى الآن</td></tr>';
+            recordsTableBody.innerHTML = '<tr><td colspan="10">لا توجد بيانات مسجلة حتى الآن</td></tr>';
             return;
         }
 
         const teacherStats = {};
 
         globalSnapshot.forEach(function(childSnapshot) {
+            const key = childSnapshot.key;
             const data = childSnapshot.val();
 
-            // حساب الإحصائيات الشاملة لكل المعلمين
             if (!teacherStats[data.teacher]) {
-                teacherStats[data.teacher] = { present: 0, absent: 0 };
-            }
-            if (data.status === 'حضر') {
-                teacherStats[data.teacher].present++;
-            } else {
-                teacherStats[data.teacher].absent++;
+                teacherStats[data.teacher] = { 
+                    present: 0,
+                    absent: 0, 
+                    late15: 0, 
+                    late20: 0, 
+                    late30: 0, 
+                    permission: 0 
+                };
             }
 
-            // تطبيق فلتر الخلية على الجدول المباشر
+            if (data.status === 'حضر') teacherStats[data.teacher].present++;
+            else if (data.status === 'لم يحضر') teacherStats[data.teacher].absent++;
+            else if (data.status === 'متأخر 15 دقيقة') teacherStats[data.teacher].late15++;
+            else if (data.status === 'متأخر 20 دقيقة') teacherStats[data.teacher].late20++;
+            else if (data.status === 'متأخر 30 دقيقة') teacherStats[data.teacher].late30++;
+            else if (data.status === 'مستأذن') teacherStats[data.teacher].permission++;
+
             if (selectedCell === 'all' || String(data.cell) === selectedCell) {
-                const statusBadge = data.status === 'حضر' 
-                    ? '<span class="badge-present">حضر</span>' 
-                    : '<span class="badge-absent">لم يحضر</span>';
+                let badgeClass = 'badge-absent';
+                if (data.status === 'حضر') badgeClass = 'badge-present';
+                else if (data.status && data.status.includes('متأخر')) badgeClass = 'badge-late';
+                else if (data.status === 'مستأذن') badgeClass = 'badge-permission';
+
+                const statusBadge = `<span class="badge ${badgeClass}">${data.status || '-'}</span>`;
 
                 const row = '<tr>' +
                     '<td>' + (data.date || '-') + '</td>' +
@@ -156,8 +188,11 @@
                     '<td>' + (data.observer || '-') + '</td>' +
                     '<td>' + (data.cell || '-') + '</td>' +
                     '<td>' + (data.period || '-') + '</td>' +
+                    '<td>' + (data.grade || '-') + '</td>' +
+                    '<td>' + (data.classroom || '-') + '</td>' +
                     '<td>' + (data.teacher || '-') + '</td>' +
                     '<td>' + statusBadge + '</td>' +
+                    '<td><button class="btn-delete-row" onclick="deleteSingleRecord(\'' + key + '\')">🗑️ مسح</button></td>' +
                 '</tr>';
                 
                 recordsTableBody.innerHTML = row + recordsTableBody.innerHTML;
@@ -165,21 +200,38 @@
         });
 
         if (recordsTableBody.innerHTML === '') {
-            recordsTableBody.innerHTML = '<tr><td colspan="7">لا توجد إدخالات لهذه الخلية حتى الآن</td></tr>';
+            recordsTableBody.innerHTML = '<tr><td colspan="10">لا توجد إدخالات لهذه الخلية حتى الآن</td></tr>';
         }
 
-        // عرض جدول إحصائيات المعلمين
         for (const teacher in teacherStats) {
+            const stat = teacherStats[teacher];
             const statRow = '<tr>' +
                 '<td><strong>' + teacher + '</strong></td>' +
-                '<td><span style="color: #27ae60; font-weight: bold;">' + teacherStats[teacher].present + '</span></td>' +
-                '<td><span style="color: #e74c3c; font-weight: bold;">' + teacherStats[teacher].absent + '</span></td>' +
+                '<td><span style="color: #27ae60; font-weight: bold;">' + stat.present + '</span></td>' +
+                '<td><span style="color: #e74c3c; font-weight: bold;">' + stat.absent + '</span></td>' +
+                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late15 + '</span></td>' +
+                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late20 + '</span></td>' +
+                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late30 + '</span></td>' +
+                '<td><span style="color: #3498db; font-weight: bold;">' + stat.permission + '</span></td>' +
             '</tr>';
             statsTableBody.innerHTML += statRow;
         }
     }
 
-    // دالة التصفير
+    // دالة مسح عنصر فردي محدد
+    function deleteSingleRecord(key) {
+        if (confirm('هل أنت تأكد من رغبتك في مسح هذا السجل؟')) {
+            database.ref('attendance/' + key).remove()
+                .then(function() {
+                    alert('تم مسح السجل بنجاح!');
+                })
+                .catch(function(error) {
+                    alert('حدث خطأ أثناء المسح: ' + error.message);
+                });
+        }
+    }
+
+    // دالة التصفير الكلي
     function clearAllData() {
         if (confirm('هل أنت تأكد من رغبتك في مسح كافة السجلات والإحصائيات؟ لا يمكن التراجع عن هذه الخطوة.')) {
             database.ref('attendance').remove()
