@@ -8,7 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .container { max-width: 650px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         h2, h3 { text-align: center; color: #2c3e50; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }
@@ -18,7 +18,7 @@
         button:hover { background: #219150; }
         .alert-success { background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; text-align: center; margin-top: 15px; display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
         th { background: #34495e; color: white; }
     </style>
 </head>
@@ -52,6 +52,22 @@
     <div class="form-group">
         <label>الحصة:</label>
         <select id="period">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>الصف:</label>
+        <select id="grade">
+            <option>أول ثانوي</option>
+            <option>ثاني ثانوي</option>
+            <option>ثالث ثانوي</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>الفصل:</label>
+        <select id="classroom">
             <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
         </select>
     </div>
@@ -91,16 +107,17 @@
             <option>وليد السلمي</option>
             <option>وليد الأمير</option>
 
-
-
         </select>
     </div>
 
     <div class="form-group">
         <label>الحالة:</label>
         <select id="status">
-            <option value="حضر">حضر</option>
             <option value="لم يحضر">لم يحضر</option>
+            <option value="متأخر 15 دقيقة">متأخر 15 دقيقة</option>
+            <option value="متأخر 20 دقيقة">متأخر 20 دقيقة</option>
+            <option value="متأخر 30 دقيقة">متأخر 30 دقيقة</option>
+            <option value="مستأذن">مستأذن</option>
         </select>
     </div>
 
@@ -115,6 +132,8 @@
             <tr>
                 <th>الخلية</th>
                 <th>الحصة</th>
+                <th>الصف</th>
+                <th>الفصل</th>
                 <th>المعلم</th>
                 <th>الحالة</th>
             </tr>
@@ -125,7 +144,7 @@
 
 <script>
     // ضع بيانات مشروعك هنا بين العلامات
-    const firebaseConfig = {
+     const firebaseConfig = {
         apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
         databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
         projectId: "school1-29236"
@@ -143,7 +162,6 @@
     }
 
     function updateDayAndFilter() {
-        // تحديث اسم اليوم تلقائياً
         const dateVal = document.getElementById('date').value;
         if (dateVal) {
             const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -152,17 +170,14 @@
             document.getElementById('day').value = days[d.getDay()];
         }
 
-        // حفظ اسم المشرف محلياً
         const obs = document.getElementById('observer').value.trim();
         if (obs) {
             localStorage.setItem('observer_name', obs);
         }
     }
 
-    // تشغيل التحديد لأول مرة
     updateDayAndFilter();
 
-    // دالة حفظ البيانات المباشرة
     function saveData() {
         const observerName = document.getElementById('observer').value.trim();
         if (!observerName) {
@@ -176,6 +191,8 @@
             observer: observerName,
             cell: document.getElementById('cell').value,
             period: document.getElementById('period').value,
+            grade: document.getElementById('grade').value,
+            classroom: document.getElementById('classroom').value,
             teacher: document.getElementById('teacher').value,
             status: document.getElementById('status').value,
             timestamp: Date.now()
@@ -192,7 +209,6 @@
             });
     }
 
-    // التحديث المباشر واللحظي لجدول المشرف المخصص
     database.ref('attendance').on('value', (snapshot) => {
         const tableBody = document.getElementById('myTodayRecords');
         tableBody.innerHTML = '';
@@ -204,13 +220,14 @@
 
         snapshot.forEach((childSnapshot) => {
             const data = childSnapshot.val();
-            // تصفية العرض: يظهر للمراقب فقط ما سجله بنفسه وفي اليوم المحدد
             if (data.observer === currentObserver && data.date === currentDate) {
                 const row = `<tr>
-                    <td>${data.cell}</td>
-                    <td>${data.period}</td>
-                    <td>${data.teacher}</td>
-                    <td>${data.status}</td>
+                    <td>${data.cell || '-'}</td>
+                    <td>${data.period || '-'}</td>
+                    <td>${data.grade || '-'}</td>
+                    <td>${data.classroom || '-'}</td>
+                    <td>${data.teacher || '-'}</td>
+                    <td>${data.status || '-'}</td>
                 </tr>`;
                 tableBody.innerHTML = row + tableBody.innerHTML;
             }
