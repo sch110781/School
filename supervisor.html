@@ -3,119 +3,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الوكيل - متابعة حضور المعلمين</title>
+    <title>لوحة التحكم والإشراف - انضباط المعلمين</title>
+    <!-- مكتبة Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <style>
-        body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
-        .container { max-width: 1150px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        h2, h3 { text-align: center; color: #2c3e50; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
-        th { background: #34495e; color: white; }
-        .stats-table th { background: #2980b9; }
-        
-        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; color: white; display: inline-block; font-size: 12px; }
-        .badge-present { background: #27ae60; }
-        .badge-absent { background: #e74c3c; }
-        .badge-late { background: #e67e22; }
-        .badge-permission { background: #3498db; }
 
-        .btn-delete {
-            background: #e74c3c;
+    <!-- خط Cairo وأيقونات Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --moe-primary: #006a55;       /* اللون الأخضر الرسمي لهوية وزارة التعليم */
+            --moe-secondary: #005040;     /* درجة أغمق للتدرج والتحويم */
+            --moe-gold: #D4AF37;          /* الذهبي لللمسات */
+            --bg-light: #F4F7F6;          /* خلفية الصفحة */
+            --text-dark: #2B363B;
+            --border-color: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            direction: rtl;
+            padding-bottom: 40px;
+        }
+
+        /* الهيدر العلوي */
+        .moe-header {
+            background: linear-gradient(135deg, var(--moe-primary), var(--moe-secondary));
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            border-bottom: 4px solid var(--moe-gold);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .moe-header .logo-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .moe-header .moe-logo {
+            height: 55px;
+            width: auto;
+            filter: brightness(0) invert(1);
+        }
+
+        .moe-header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        /* الحاوية الرئيسية */
+        .container {
+            max-width: 1000px;
+            margin: 25px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 106, 85, 0.08);
+            border: 1px solid rgba(0, 106, 85, 0.08);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--moe-primary);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #EBF1F0;
+        }
+
+        .section-title-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            color: var(--moe-gold);
+        }
+
+        /* عناصر التصفية */
+        .filter-card {
+            background-color: #FAFCFC;
+            border: 1.5px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--moe-primary);
+            font-size: 14px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Cairo', sans-serif;
+            transition: all 0.25s ease;
+            background-color: #ffffff;
+            color: #2D3748;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--moe-primary);
+            box-shadow: 0 0 0 3.5px rgba(0, 106, 85, 0.12);
+        }
+
+        /* الأزرار */
+        .btn-danger {
+            background-color: #e53e3e;
             color: white;
             border: none;
-            padding: 10px 18px;
+            padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            display: block;
-            margin: 0 auto 20px auto;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
         }
-        .btn-delete:hover { background: #c0392b; }
 
-        .btn-delete-row {
-            background: #ff4d4d;
-            color: white;
+        .btn-danger:hover {
+            background-color: #c53030;
+        }
+
+        .btn-delete-item {
+            background-color: #fed7d7;
+            color: #9b2c2c;
             border: none;
             padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            transition: all 0.2s;
         }
-        .btn-delete-row:hover { background: #cc0000; }
 
-        .filter-container {
-            background: #eef2f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+        .btn-delete-item:hover {
+            background-color: #e53e3e;
+            color: white;
         }
-        .filter-container label { font-weight: bold; color: #2c3e50; }
-        .filter-container select { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; }
+
+        /* الجداول */
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th {
+            background: var(--moe-primary);
+            color: white;
+            padding: 12px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid var(--moe-gold);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 11px 10px;
+            text-align: center;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+
+        tr:hover {
+            background-color: #F0F7F6;
+        }
+
+        /* ألوان الحالات (Badges) */
+        .badge-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .status-absent {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+        }
+
+        .status-delay-15 {
+            background-color: #feebc8;
+            color: #9c4221;
+        }
+
+        .status-delay-20 {
+            background-color: #fefcbf;
+            color: #744210;
+        }
+
+        .status-delay-30 {
+            background-color: #feebc8;
+            color: #7b341e;
+        }
+
+        .status-excused {
+            background-color: #ebf8ff;
+            color: #2c5282;
+        }
+
+        .status-attended {
+            background-color: #c6f6d5;
+            color: #22543d;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
 
+<!-- رأس الصفحة -->
+<header class="moe-header">
+    <div class="logo-title">
+        <img src="https://upload.wikimedia.org/wikipedia/ar/1/17/Saudi_Ministry_of_Education_Logo_2025.png" alt="شعار التعليم" class="moe-logo">
+        <h1>لوحة التحكم والمتابعة الميدانية</h1>
+    </div>
+</header>
+
 <div class="container">
-    <h2>لوحة تحكم المشرف - المتابعة اللحظية</h2>
-
-    <!-- زر التصفير الكلي -->
-    <button class="btn-delete" onclick="clearAllData()">🗑️ مسح جميع البيانات والإحصائيات</button>
-
-    <h3>إحصائيات المعلمين</h3>
-    <table class="stats-table">
-        <thead>
-            <tr>
-                <th>اسم المعلم</th>
-                <th>حضر</th>
-                <th>لم يحضر</th>
-                <th>تأخير 15د</th>
-                <th>تأخير 20د</th>
-                <th>تأخير 30د</th>
-                <th>مستأذن</th>
-            </tr>
-        </thead>
-        <tbody id="statsTableBody"></tbody>
-    </table>
-
-    <h3>سجل الإدخالات المباشر</h3>
     
-    <!-- فلتر تصنيف الخلايا -->
-    <div class="filter-container">
-        <label for="cellFilter">تصفية حسب الخلية:</label>
-        <select id="cellFilter" onchange="renderData()">
-            <option value="all">جميع الخلايا</option>
-            <option value="1">الخلية 1</option>
-            <option value="2">الخلية 2</option>
-            <option value="3">الخلية 3</option>
-            <option value="4">الخلية 4</option>
-            <option value="5">الخلية 5</option>
-        </select>
+    <div class="filter-card">
+        <div class="section-title" style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0;">
+            <div class="section-title-left">
+                <i class="fa-solid fa-filter"></i>
+                <span>خيارات التصفية والبحث</span>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label><i class="fa-regular fa-calendar-days"></i> اختر التاريخ:</label>
+                <input type="date" id="filterDate" onchange="loadData()">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fa-solid fa-clock-rotate-left"></i> نطاق الإحصائية:</label>
+                <select id="statsScope" onchange="loadData()">
+                    <option value="SELECTED_DATE" selected>اليوم المحدد فقط</option>
+                    <option value="ALL_TIME">كافة الأيام (تراكمي)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fa-solid fa-border-all"></i> تصفية بالخلية:</label>
+                <select id="filterCell" onchange="loadData()">
+                    <option value="ALL">جميع الخلايا</option>
+                    <option value="1">الخلية 1</option>
+                    <option value="2">الخلية 2</option>
+                    <option value="3">الخلية 3</option>
+                    <option value="4">الخلية 4</option>
+                    <option value="5">الخلية 5</option>
+                </select>
+            </div>
+        </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>التاريخ</th>
-                <th>اليوم</th>
-                <th>المشرف</th>
-                <th>الخلية</th>
-                <th>الحصة</th>
-                <th>الصف</th>
-                <th>الفصل</th>
-                <th>المعلم</th>
-                <th>الحالة</th>
-                <th>إجراء</th>
-            </tr>
-        </thead>
-        <tbody id="recordsTableBody"></tbody>
-    </table>
+    <!-- جدول الإحصائيات -->
+    <div class="section-title">
+        <div class="section-title-left">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>مجموع حالات المعلمين</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>المعلم</th>
+                    <th>لم يحضر</th>
+                    <th>تأخير 15 د</th>
+                    <th>تأخير 20 د</th>
+                    <th>تأخير 30 د</th>
+                    <th>مستأذن</th>
+                </tr>
+            </thead>
+            <tbody id="statsTableBody">
+                <tr><td colspan="6">جاري تحميل البيانات...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- جدول السجل التفصيلي -->
+    <div class="section-title">
+        <div class="section-title-left">
+            <i class="fa-solid fa-table-list"></i>
+            <span>السجل التفصيلي للإدخالات</span>
+        </div>
+        <button class="btn-danger" onclick="deleteAllData()">
+            <i class="fa-solid fa-trash-can"></i> مسح جميع البيانات
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>المشرف</th>
+                    <th>الخلية</th>
+                    <th>الحصة</th>
+                    <th>الصف</th>
+                    <th>الفصل</th>
+                    <th>المعلم</th>
+                    <th>الحالة</th>
+                    <th>إجراء</th>
+                </tr>
+            </thead>
+            <tbody id="recordsTableBody">
+                <tr><td colspan="9">جاري تحميل البيانات...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer-note">
+        نظام تسجيل الحضور والانضباط الميداني
+    </div>
 </div>
 
 <script>
@@ -125,122 +395,171 @@
         projectId: "school1-29236"
     };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    let globalSnapshot = null;
+    // ضبط التاريخ الافتراضي ليكون تاريخ اليوم
+    document.getElementById('filterDate').valueAsDate = new Date();
 
-    database.ref('attendance').on('value', function(snapshot) {
-        globalSnapshot = snapshot;
-        renderData();
+    let rawData = {};
+
+    // الاستماع للبيانات من Firebase
+    database.ref('attendance').on('value', (snapshot) => {
+        rawData = snapshot.val() || {};
+        populateCellDropdown();
+        loadData();
     });
 
-    function renderData() {
+    // تعبئة القائمة المنسدلة بالخلايا مع إتاحة الخلايا 1 إلى 5 بشكل افتراضي
+    function populateCellDropdown() {
+        const cellSelect = document.getElementById('filterCell');
+        const currentSelected = cellSelect.value;
+        
+        const defaultCells = new Set(["1", "2", "3", "4", "5"]);
+        Object.values(rawData).forEach(item => {
+            if (item.cell) defaultCells.add(item.cell.trim());
+        });
+
+        cellSelect.innerHTML = '<option value="ALL">جميع الخلايا</option>';
+        Array.from(defaultCells).sort((a, b) => a.localeCompare(b, undefined, {numeric: true})).forEach(cell => {
+            const option = document.createElement('option');
+            option.value = cell;
+            option.textContent = "الخلية " + cell;
+            cellSelect.appendChild(option);
+        });
+
+        cellSelect.value = currentSelected || "ALL";
+    }
+
+    // تحديد كلاس التنسيق الخاص بكل حالة
+    function getStatusBadgeClass(status) {
+        switch (status) {
+            case 'لم يحضر':
+                return 'status-absent';
+            case 'متأخر 15 دقيقة':
+                return 'status-delay-15';
+            case 'متأخر 20 دقيقة':
+                return 'status-delay-20';
+            case 'متأخر 30 دقيقة':
+                return 'status-delay-30';
+            case 'مستأذن':
+                return 'status-excused';
+            case 'حضر':
+                return 'status-attended';
+            default:
+                return '';
+        }
+    }
+
+    // معالجة وعرض البيانات
+    function loadData() {
+        const selectedDate = document.getElementById('filterDate').value;
+        const selectedCell = document.getElementById('filterCell').value;
+        const statsScope = document.getElementById('statsScope').value;
+
         const recordsTableBody = document.getElementById('recordsTableBody');
         const statsTableBody = document.getElementById('statsTableBody');
-        const selectedCell = document.getElementById('cellFilter').value;
-        
+
         recordsTableBody.innerHTML = '';
         statsTableBody.innerHTML = '';
 
-        if (!globalSnapshot || !globalSnapshot.exists()) {
-            recordsTableBody.innerHTML = '<tr><td colspan="10">لا توجد بيانات مسجلة حتى الآن</td></tr>';
-            return;
-        }
-
+        const filteredRecords = [];
         const teacherStats = {};
 
-        globalSnapshot.forEach(function(childSnapshot) {
-            const key = childSnapshot.key;
-            const data = childSnapshot.val();
+        Object.entries(rawData).forEach(([key, item]) => {
+            const matchDate = !selectedDate || item.date === selectedDate;
+            const matchCell = selectedCell === 'ALL' || (item.cell && item.cell.trim() === selectedCell);
 
-            if (!teacherStats[data.teacher]) {
-                teacherStats[data.teacher] = { 
-                    present: 0,
-                    absent: 0, 
-                    late15: 0, 
-                    late20: 0, 
-                    late30: 0, 
-                    permission: 0 
-                };
+            // السجل التفصيلي يستند لخيارات التصفية المختارة
+            if (matchDate && matchCell) {
+                filteredRecords.push({ key, ...item });
             }
 
-            if (data.status === 'حضر') teacherStats[data.teacher].present++;
-            else if (data.status === 'لم يحضر') teacherStats[data.teacher].absent++;
-            else if (data.status === 'متأخر 15 دقيقة') teacherStats[data.teacher].late15++;
-            else if (data.status === 'متأخر 20 دقيقة') teacherStats[data.teacher].late20++;
-            else if (data.status === 'متأخر 30 دقيقة') teacherStats[data.teacher].late30++;
-            else if (data.status === 'مستأذن') teacherStats[data.teacher].permission++;
+            // الإحصائيات تستند لنطاق الإحصائية (اليوم المحدد فقط أم كافة الأيام)
+            const matchStatsDate = (statsScope === 'ALL_TIME') || matchDate;
+            if (matchStatsDate && matchCell) {
+                const teacherName = item.teacher || 'غير محدد';
+                if (!teacherStats[teacherName]) {
+                    teacherStats[teacherName] = {
+                        absent: 0,
+                        delay15: 0,
+                        delay20: 0,
+                        delay30: 0,
+                        excused: 0
+                    };
+                }
 
-            if (selectedCell === 'all' || String(data.cell) === selectedCell) {
-                let badgeClass = 'badge-absent';
-                if (data.status === 'حضر') badgeClass = 'badge-present';
-                else if (data.status && data.status.includes('متأخر')) badgeClass = 'badge-late';
-                else if (data.status === 'مستأذن') badgeClass = 'badge-permission';
-
-                const statusBadge = `<span class="badge ${badgeClass}">${data.status || '-'}</span>`;
-
-                const row = '<tr>' +
-                    '<td>' + (data.date || '-') + '</td>' +
-                    '<td>' + (data.day || '-') + '</td>' +
-                    '<td>' + (data.observer || '-') + '</td>' +
-                    '<td>' + (data.cell || '-') + '</td>' +
-                    '<td>' + (data.period || '-') + '</td>' +
-                    '<td>' + (data.grade || '-') + '</td>' +
-                    '<td>' + (data.classroom || '-') + '</td>' +
-                    '<td>' + (data.teacher || '-') + '</td>' +
-                    '<td>' + statusBadge + '</td>' +
-                    '<td><button class="btn-delete-row" onclick="deleteSingleRecord(\'' + key + '\')">🗑️ مسح</button></td>' +
-                '</tr>';
-                
-                recordsTableBody.innerHTML = row + recordsTableBody.innerHTML;
+                const status = item.status || '';
+                if (status === 'لم يحضر') teacherStats[teacherName].absent++;
+                else if (status === 'متأخر 15 دقيقة') teacherStats[teacherName].delay15++;
+                else if (status === 'متأخر 20 دقيقة') teacherStats[teacherName].delay20++;
+                else if (status === 'متأخر 30 دقيقة') teacherStats[teacherName].delay30++;
+                else if (status === 'مستأذن') teacherStats[teacherName].excused++;
             }
         });
 
-        if (recordsTableBody.innerHTML === '') {
-            recordsTableBody.innerHTML = '<tr><td colspan="10">لا توجد إدخالات لهذه الخلية حتى الآن</td></tr>';
+        // عرض السجل التفصيلي
+        if (filteredRecords.length === 0) {
+            recordsTableBody.innerHTML = '<tr><td colspan="9">لا توجد بيانات مطابقة للخيارات المحددة</td></tr>';
+        } else {
+            filteredRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            filteredRecords.forEach(data => {
+                const badgeClass = getStatusBadgeClass(data.status);
+                const row = `<tr>
+                    <td>${data.date || '-'}</td>
+                    <td>${data.observer || '-'}</td>
+                    <td>${data.cell || '-'}</td>
+                    <td>${data.period || '-'}</td>
+                    <td>${data.grade || '-'}</td>
+                    <td>${data.classroom || '-'}</td>
+                    <td><strong>${data.teacher || '-'}</strong></td>
+                    <td><span class="badge-status ${badgeClass}">${data.status || '-'}</span></td>
+                    <td>
+                        <button class="btn-delete-item" onclick="deleteSingleRecord('${data.key}')" title="مسح">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+                recordsTableBody.innerHTML += row;
+            });
         }
 
-        for (const teacher in teacherStats) {
-            const stat = teacherStats[teacher];
-            const statRow = '<tr>' +
-                '<td><strong>' + teacher + '</strong></td>' +
-                '<td><span style="color: #27ae60; font-weight: bold;">' + stat.present + '</span></td>' +
-                '<td><span style="color: #e74c3c; font-weight: bold;">' + stat.absent + '</span></td>' +
-                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late15 + '</span></td>' +
-                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late20 + '</span></td>' +
-                '<td><span style="color: #e67e22; font-weight: bold;">' + stat.late30 + '</span></td>' +
-                '<td><span style="color: #3498db; font-weight: bold;">' + stat.permission + '</span></td>' +
-            '</tr>';
-            statsTableBody.innerHTML += statRow;
+        // عرض إحصائيات المعلمين
+        const teacherNames = Object.keys(teacherStats).sort();
+        if (teacherNames.length === 0) {
+            statsTableBody.innerHTML = '<tr><td colspan="6">لا توجد إحصائيات لعرضها</td></tr>';
+        } else {
+            teacherNames.forEach(teacher => {
+                const st = teacherStats[teacher];
+
+                const row = `<tr>
+                    <td><strong>${teacher}</strong></td>
+                    <td style="color: #e53e3e; font-weight: bold;">${st.absent}</td>
+                    <td>${st.delay15}</td>
+                    <td>${st.delay20}</td>
+                    <td>${st.delay30}</td>
+                    <td style="color: #dd6b20; font-weight: bold;">${st.excused}</td>
+                </tr>`;
+                statsTableBody.innerHTML += row;
+            });
         }
     }
 
-    // دالة مسح عنصر فردي محدد
+    // مسح سجل فردي
     function deleteSingleRecord(key) {
-        if (confirm('هل أنت تأكد من رغبتك في مسح هذا السجل؟')) {
+        if (confirm("هل أنت تأكد من رغبتك في حذف هذا السجل؟")) {
             database.ref('attendance/' + key).remove()
-                .then(function() {
-                    alert('تم مسح السجل بنجاح!');
-                })
-                .catch(function(error) {
-                    alert('حدث خطأ أثناء المسح: ' + error.message);
-                });
+                .then(() => alert("تم حذف السجل بنجاح."))
+                .catch((error) => alert("حدث خطأ أثناء الحذف: " + error.message));
         }
     }
 
-    // دالة التصفير الكلي
-    function clearAllData() {
-        if (confirm('هل أنت تأكد من رغبتك في مسح كافة السجلات والإحصائيات؟ لا يمكن التراجع عن هذه الخطوة.')) {
+    // مسح جميع البيانات
+    function deleteAllData() {
+        if (confirm("تحذير: هل أنت متأكد تماماً من مسح جميع بيانات الحضور والإحصائيات نهائياً؟ لا يمكن التراجع عن هذا الإجراء.")) {
             database.ref('attendance').remove()
-                .then(function() {
-                    alert('تم مسح جميع البيانات بنجاح!');
-                })
-                .catch(function(error) {
-                    alert('حدث خطأ أثناء المسح: ' + error.message);
-                });
+                .then(() => alert("تم مسح كافة البيانات بنجاح."))
+                .catch((error) => alert("حدث خطأ أثناء مسح البيانات: " + error.message));
         }
     }
 </script>
