@@ -3,149 +3,395 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل حضور المعلمين - إدخال</title>
+    <title>نظام متابعة انضباط المعلمين</title>
+    <!-- مكتبة Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- خط Cairo وأيقونات Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; direction: rtl; }
-        .container { max-width: 650px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        h2, h3 { text-align: center; color: #2c3e50; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; }
-        select, input, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
-        input[readonly] { background-color: #eef2f7; cursor: not-allowed; }
-        button { background: #27ae60; color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 15px; }
-        button:hover { background: #219150; }
-        .alert-success { background: #d4edda; color: #155724; padding: 10px; border-radius: 6px; text-align: center; margin-top: 15px; display: none; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
-        th { background: #34495e; color: white; }
+        :root {
+            --moe-primary: #006a55;       /* اللون الأخضر الرسمي لهوية وزارة التعليم */
+            --moe-secondary: #005040;     /* درجة أغمق للتدرج والتحويم */
+            --moe-gold: #D4AF37;          /* الذهبي لللمسات */
+            --bg-light: #F4F7F6;          /* خلفية الصفحة */
+            --text-dark: #2B363B;
+            --border-color: #E2E8F0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            direction: rtl;
+            padding-bottom: 40px;
+        }
+
+        /* الهيدر العلوي */
+        .moe-header {
+            background: linear-gradient(135deg, var(--moe-primary), var(--moe-secondary));
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            border-bottom: 4px solid var(--moe-gold);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .moe-header .logo-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .moe-header .moe-logo {
+            height: 55px;
+            width: auto;
+            filter: brightness(0) invert(1); /* تحويل اللوجو للون الأبيض ليتناسب مع الخلفية */
+        }
+
+        .moe-header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        /* الحاوية الرئيسية */
+        .container {
+            max-width: 720px;
+            margin: 25px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 106, 85, 0.08);
+            border: 1px solid rgba(0, 106, 85, 0.08);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--moe-primary);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #EBF1F0;
+        }
+
+        .section-title i {
+            color: var(--moe-gold);
+        }
+
+        /* شبكة النماذج مرتبة */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--moe-primary);
+            font-size: 14px;
+        }
+
+        label i {
+            color: var(--moe-primary);
+            width: 16px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Cairo', sans-serif;
+            transition: all 0.25s ease;
+            background-color: #FAFCFC;
+            color: #2D3748;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--moe-primary);
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3.5px rgba(0, 106, 85, 0.12);
+        }
+
+        input[readonly] {
+            background-color: #EDF2F4;
+            color: #718096;
+            cursor: not-allowed;
+            border-color: #CBD5E0;
+        }
+
+        /* الأزرار */
+        .btn-submit {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--moe-primary), var(--moe-secondary));
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+            font-family: 'Cairo', sans-serif;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 12px rgba(0, 106, 85, 0.2);
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-submit:hover {
+            background: linear-gradient(135deg, var(--moe-secondary), #00382d);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0, 106, 85, 0.3);
+        }
+
+        /* رسالة النجاح */
+        .alert-success {
+            background: #E6F4EA;
+            color: #137333;
+            border: 1px solid #CEEAD6;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* تصميم الجدول المطور */
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th {
+            background: var(--moe-primary);
+            color: white;
+            padding: 12px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid var(--moe-gold);
+        }
+
+        td {
+            padding: 11px 10px;
+            text-align: center;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+
+        tr:hover {
+            background-color: #F0F7F6;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
 
+<!-- رأس الصفحة -->
+<header class="moe-header">
+    <div class="logo-title">
+        <img src="https://upload.wikimedia.org/wikipedia/ar/1/17/Saudi_Ministry_of_Education_Logo_2025.png" alt="شعار التعليم" class="moe-logo">
+        <h1>نظام متابعة انضباط المعلمين</h1>
+    </div>
+</header>
+
 <div class="container">
-    <h2>تسجيل حضور المعلم</h2>
     
-    <div class="form-group">
-        <label>التاريخ:</label>
-        <input type="date" id="date" onchange="updateDayAndFilter()">
+    <div class="section-title">
+        <i class="fa-solid fa-pen-to-square"></i>
+        <span>إدخال بيانات الحضور والغياب</span>
     </div>
 
-    <div class="form-group">
-        <label>اليوم:</label>
-        <input type="text" id="day" readonly>
+    <div class="form-grid">
+        <div class="form-group">
+            <label><i class="fa-regular fa-calendar-days"></i> التاريخ:</label>
+            <input type="date" id="date" onchange="updateDayAndFilter()">
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-calendar-day"></i> اليوم:</label>
+            <input type="text" id="day" readonly>
+        </div>
+
+        <div class="form-group full-width">
+            <label><i class="fa-solid fa-user-shield"></i> اسم المشرف (المُدخل):</label>
+            <input type="text" id="observer" placeholder="اكتب اسم المشرف هنا" oninput="updateDayAndFilter()">
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-layer-group"></i> الخلية:</label>
+            <select id="cell">
+                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-clock"></i> الحصة:</label>
+            <select id="period">
+                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-school"></i> الصف:</label>
+            <select id="grade">
+                <option>أول ثانوي</option>
+                <option>ثاني ثانوي</option>
+                <option>ثالث ثانوي</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-door-closed"></i> الفصل:</label>
+            <select id="classroom">
+                <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+            </select>
+        </div>
+
+        <div class="form-group full-width">
+            <label><i class="fa-solid fa-chalkboard-user"></i> اسم المعلم:</label>
+            <select id="teacher">
+                <option>أحمد هزازي</option>
+                <option>أحمد الخميس</option>
+                <option>جبهان الشمري</option>
+                <option>حسن العيدروس</option>
+                <option>زيد الهيلي</option>
+                <option>سامر الفهمي</option>
+                <option>سعود الخماش</option>
+                <option>سلطان المالكي</option>
+                <option>سلمان الحربي</option>
+                <option>صالح القرني</option>
+                <option>طارق الحارثي</option>
+                <option>عبدالاله الغامدي</option>
+                <option>عبدالعزيز السبيعي</option>
+                <option>عبدالله الدوسري</option>
+                <option>عبدالله الحارثي</option>
+                <option>عثمان الفارس</option>
+                <option>علي الأسمري</option>
+                <option>فهد الزومان</option>
+                <option>فهد الحارثي</option>
+                <option>فيصل الشهري</option>
+                <option>ماجد المطيري</option>
+                <option>مبارك الوقداني</option>
+                <option>محمد بن داود</option>
+                <option>محمد الفراج</option>
+                <option>محمد النصار</option>
+                <option>محمد العمري</option>
+                <option>محمد السبيعي</option>
+                <option>محمد الغامدي</option>
+                <option>مشبب الأحمري</option>
+                <option>موسى البعداني</option>
+                <option>وليد السلمي</option>
+                <option>وليد الأمير</option>
+            </select>
+        </div>
+
+        <div class="form-group full-width">
+            <label><i class="fa-solid fa-clipboard-check"></i> حالة الحضور:</label>
+            <select id="status">
+                <option value="لم يحضر">لم يحضر</option>
+                <option value="متأخر 15 دقيقة">متأخر 15 دقيقة</option>
+                <option value="متأخر 20 دقيقة">متأخر 20 دقيقة</option>
+                <option value="متأخر 30 دقيقة">متأخر 30 دقيقة</option>
+                <option value="مستأذن">مستأذن</option>
+            </select>
+        </div>
     </div>
 
-    <div class="form-group">
-        <label>اسم المشرف (المُدخل):</label>
-        <input type="text" id="observer" placeholder="اكتب اسمك هنا" oninput="updateDayAndFilter()">
+    <button class="btn-submit" onclick="saveData()">
+        <i class="fa-solid fa-floppy-disk"></i> تسجيل البيانات
+    </button>
+    
+    <div id="successMsg" class="alert-success">
+        <i class="fa-solid fa-circle-check"></i> تم تسجيل البيانات بنجاح!
     </div>
 
-    <div class="form-group">
-        <label>الخلية:</label>
-        <select id="cell">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-        </select>
+    <div class="section-title" style="margin-top: 35px;">
+        <i class="fa-solid fa-list-check"></i>
+        <span>إدخالاتك لهذا اليوم</span>
     </div>
 
-    <div class="form-group">
-        <label>الحصة:</label>
-        <select id="period">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
-        </select>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>الخلية</th>
+                    <th>الحصة</th>
+                    <th>الصف</th>
+                    <th>الفصل</th>
+                    <th>المعلم</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody id="myTodayRecords"></tbody>
+        </table>
     </div>
 
-    <div class="form-group">
-        <label>الصف:</label>
-        <select id="grade">
-            <option>أول ثانوي</option>
-            <option>ثاني ثانوي</option>
-            <option>ثالث ثانوي</option>
-        </select>
+    <div class="footer-note">
+        نظام تسجيل الحضور والانضباط الميداني
     </div>
-
-    <div class="form-group">
-        <label>الفصل:</label>
-        <select id="classroom">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>اسم المعلم:</label>
-        <select id="teacher">
-            <option>أحمد هزازي</option>
-            <option>أحمد الخميس</option>
-            <option>جبهان الشمري</option>
-            <option>حسن العيدروس</option>
-            <option>زيد الهيلي</option>
-            <option>سامر الفهمي</option>
-            <option>سعود الخماش</option>
-            <option>سلطان المالكي</option>
-            <option>سلمان الحربي</option>
-            <option>صالح القرني</option>
-            <option>طارق الحارثي</option>
-            <option>عبدالاله الغامدي</option>
-            <option>عبدالعزيز السبيعي</option>
-            <option>عبدالله الدوسري </option>
-            <option>عبدالله الحارثي</option>
-            <option>عثمان الفارس</option>
-            <option>علي الأسمري</option>
-            <option>فهد الزومان</option>
-            <option>فهد الحارثي</option>
-            <option>فيصل الشهري</option>
-            <option>ماجد المطيري</option>
-            <option>مبارك الوقداني</option>
-            <option>محمد بن داود</option>
-            <option>محمد الفراج</option>
-            <option>محمد النصار</option>
-            <option>محمد العمري</option>
-            <option>محمد السبيعي</option>
-            <option>محمد الغامدي</option>
-            <option>مشبب الأحمري</option>
-            <option>موسى البعداني</option>
-            <option>وليد السلمي</option>
-            <option>وليد الأمير</option>
-
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>الحالة:</label>
-        <select id="status">
-            <option value="لم يحضر">لم يحضر</option>
-            <option value="متأخر 15 دقيقة">متأخر 15 دقيقة</option>
-            <option value="متأخر 20 دقيقة">متأخر 20 دقيقة</option>
-            <option value="متأخر 30 دقيقة">متأخر 30 دقيقة</option>
-            <option value="مستأذن">مستأذن</option>
-        </select>
-    </div>
-
-    <button onclick="saveData()">تسجيل البيانات</button>
-    <div id="successMsg" class="alert-success">تم تسجيل البيانات بنجاح!</div>
-
-    <hr style="margin-top: 30px; border: 0; border-top: 1px solid #eee;">
-
-    <h3>إدخالاتك لهذا اليوم</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>الخلية</th>
-                <th>الحصة</th>
-                <th>الصف</th>
-                <th>الفصل</th>
-                <th>المعلم</th>
-                <th>الحالة</th>
-            </tr>
-        </thead>
-        <tbody id="myTodayRecords"></tbody>
-    </table>
 </div>
 
 <script>
-    // ضع بيانات مشروعك هنا بين العلامات
-     const firebaseConfig = {
+    const firebaseConfig = {
         apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
         databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
         projectId: "school1-29236"
@@ -154,7 +400,6 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // إعدادات التشغيل عند فتح الصفحة
     document.getElementById('date').valueAsDate = new Date();
     
     const savedObserver = localStorage.getItem('observer_name');
@@ -228,7 +473,7 @@
                     <td>${data.grade || '-'}</td>
                     <td>${data.classroom || '-'}</td>
                     <td>${data.teacher || '-'}</td>
-                    <td>${data.status || '-'}</td>
+                    <td><strong>${data.status || '-'}</strong></td>
                 </tr>`;
                 tableBody.innerHTML = row + tableBody.innerHTML;
             }
