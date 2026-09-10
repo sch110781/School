@@ -262,8 +262,8 @@
 
     <div class="form-grid">
         <div class="form-group">
-            <label><i class="fa-regular fa-calendar-days"></i> التاريخ:</label>
-            <input type="date" id="date" onchange="updateDayAndFilter()">
+            <label><i class="fa-regular fa-calendar-days"></i> التاريخ (هجري وميلادي):</label>
+            <input type="text" id="date" readonly>
         </div>
 
         <div class="form-group">
@@ -400,21 +400,42 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    document.getElementById('date').valueAsDate = new Date();
-    
     const savedObserver = localStorage.getItem('observer_name');
     if (savedObserver) {
         document.getElementById('observer').value = savedObserver;
     }
 
     function updateDayAndFilter() {
-        const dateVal = document.getElementById('date').value;
-        if (dateVal) {
-            const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-            const parts = dateVal.split('-');
-            const d = new Date(parts[0], parts[1] - 1, parts[2]);
-            document.getElementById('day').value = days[d.getDay()];
-        }
+        const now = new Date();
+        const dateParts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Riyadh',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(now);
+        const parts = Object.fromEntries(dateParts.map(({ type, value }) => [type, value]));
+        const gregorianDate = `${parts.year}-${parts.month}-${parts.day}`;
+        const gregorianDisplay = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+            timeZone: 'Asia/Riyadh',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        }).format(now);
+        const hijriDisplay = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+            timeZone: 'Asia/Riyadh',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        }).format(now);
+        const dayDisplay = new Intl.DateTimeFormat('ar-SA', {
+            timeZone: 'Asia/Riyadh',
+            weekday: 'long'
+        }).format(now);
+
+        const dateInput = document.getElementById('date');
+        dateInput.value = `${gregorianDisplay} | ${hijriDisplay}`;
+        dateInput.dataset.gregorianDate = gregorianDate;
+        document.getElementById('day').value = dayDisplay;
 
         const obs = document.getElementById('observer').value.trim();
         if (obs) {
@@ -432,7 +453,7 @@
         }
 
         const record = {
-            date: document.getElementById('date').value,
+            date: document.getElementById('date').dataset.gregorianDate,
             day: document.getElementById('day').value,
             observer: observerName,
             cell: document.getElementById('cell').value,
@@ -460,7 +481,7 @@
         tableBody.innerHTML = '';
         
         const currentObserver = document.getElementById('observer').value.trim();
-        const currentDate = document.getElementById('date').value;
+        const currentDate = document.getElementById('date').dataset.gregorianDate;
 
         if (!currentObserver || !currentDate) return;
 
