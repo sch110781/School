@@ -1,3 +1,13 @@
+import { getAuth, signInAnonymously } from "firebase/auth";
+
+const auth = getAuth();
+signInAnonymously(auth)
+  .then(() => {
+    // تم تسجيل الدخول بنجاح، يمكنك الآن القراءة والكتابة
+  })
+  .catch((error) => {
+    console.error("خطأ في تسجيل الدخول:", error);
+  });
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
