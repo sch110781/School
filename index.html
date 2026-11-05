@@ -394,33 +394,20 @@
 </div>
 
 <script>
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-const firebaseConfig = {
-   apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+   const firebaseConfig = {
+       apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
         databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
         projectId: "school1-29236"
-};
+    };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-// تنفيذ تسجيل الدخول
-signInAnonymously(auth);
-#    const firebaseConfig = {
-   #     apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
-   #     databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
-   #     projectId: "school1-29236"
- #   };
-
- #   firebase.initializeApp(firebaseConfig);
- #   const database = firebase.database();
-
-  #  const savedObserver = localStorage.getItem('observer_name');
-  #  if (savedObserver) {
-     #   document.getElementById('observer').value = savedObserver;
-    #}
+  const savedObserver = localStorage.getItem('observer_name');
+    if (savedObserver) {
+        document.getElementById('observer').value = savedObserver;
+    }
 
     function updateDayAndFilter() {
         const now = new Date();
@@ -518,17 +505,6 @@ signInAnonymously(auth);
         });
     });
 </script>
-<script type="module">
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-  const auth = getAuth();
-  signInAnonymously(auth)
-    .then(() => {
-      console.log("تم تسجيل الدخول المجهول بنجاح!");
-    })
-    .catch((error) => {
-      console.error("حدث خطأ:", error);
-    });
-</script>
 </body>
 </html>
