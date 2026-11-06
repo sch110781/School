@@ -10,6 +10,7 @@
     <!-- مكتبة Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
     <!-- خط Cairo وأيقونات Font Awesome -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -244,6 +245,13 @@
             color: #888;
             margin-top: 20px;
         }
+    
+        .auth-container[hidden], #appContainer[hidden] { display: none !important; }
+        .auth-note { color: #64748b; font-size: 13px; line-height: 1.8; margin-top: 12px; }
+        .auth-error { display: none; color: #b42318; background: #fff1f0; border: 1px solid #ffd7d2; border-radius: 8px; padding: 10px 12px; margin-top: 12px; font-size: 13px; }
+        .auth-secondary { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: white; color: var(--moe-primary); font: 600 14px 'Cairo', sans-serif; cursor: pointer; }
+        .auth-secondary:hover, .btn-logout:hover { background: #f0f7f6; }
+        .btn-logout { margin-top: 10px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: white; color: var(--moe-primary); font: 600 13px 'Cairo', sans-serif; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -256,7 +264,34 @@
     </div>
 </header>
 
-<div class="container">
+<div id="authContainer" class="container auth-container">
+    <div class="section-title">
+        <i class="fa-solid fa-lock"></i>
+        <span>تسجيل الدخول</span>
+    </div>
+    <form id="phoneLoginForm" autocomplete="on">
+        <div id="phoneEntry">
+            <div class="form-group">
+                <label for="phoneNumber"><i class="fa-solid fa-mobile-screen-button"></i> رقم الجوال بصيغة دولية:</label>
+                <input type="tel" id="phoneNumber" inputmode="tel" autocomplete="tel" placeholder="+9665XXXXXXXX" required>
+            </div>
+            <div id="recaptcha-container"></div>
+            <button class="btn-submit" type="submit"><i class="fa-solid fa-message"></i> إرسال رمز SMS</button>
+        </div>
+        <div id="codeEntry" hidden>
+            <div class="form-group">
+                <label for="smsCode"><i class="fa-solid fa-key"></i> رمز التحقق المرسل:</label>
+                <input type="text" id="smsCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*">
+            </div>
+            <button class="btn-submit" type="submit"><i class="fa-solid fa-right-to-bracket"></i> تحقق ودخول</button>
+            <button class="auth-secondary" id="changePhoneButton" type="button">استخدام رقم جوال آخر</button>
+        </div>
+    </form>
+    <div id="authError" class="auth-error" role="alert"></div>
+    <p class="auth-note">ستصلك رسالة SMS للتحقق. بعد أول دخول، يجب أن يضيف المسؤول UID حسابك إلى قائمة المستخدمين المصرح لهم قبل استخدام السجلات.</p>
+</div>
+
+<div id="appContainer" class="container" hidden>
     
     <div class="section-title">
         <i class="fa-solid fa-pen-to-square"></i>
@@ -389,51 +424,141 @@
     </div>
 
     <div class="footer-note">
-        نظام تسجيل الحضور والانضباط الميداني
+        نظام تسجيل الحضور والانضباط الميداني<br>
+        <button id="signOutButton" type="button" class="btn-logout">تسجيل الخروج</button>
     </div>
 </div>
 
 <script>
-
-   const firebaseConfig = {
-       apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+    const firebaseConfig = {
+        // أدخل apiKey محليًا من إعدادات Firebase؛ لا ترسله في المحادثة.
+        apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+        authDomain: "school1-29236.firebaseapp.com",
         databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
-        projectId: "school1-29236"
+        projectId: "school1-29236",
+        storageBucket: "school1-29236.firebasestorage.app",
+        messagingSenderId: "479051477085",
+        appId: "1:479051477085:web:a366101c5515b9c692ddb4"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
+    const auth = firebase.auth();
+    const authContainer = document.getElementById('authContainer');
+    const appContainer = document.getElementById('appContainer');
+    const authError = document.getElementById('authError');
+    let attendanceRef = null;
+    let currentAttendanceSnapshot = null;
+    let confirmationResult = null;
+    let recaptchaVerifier = null;
+    let pendingAuthMessage = '';
 
-  const savedObserver = localStorage.getItem('observer_name');
-    if (savedObserver) {
-        document.getElementById('observer').value = savedObserver;
+    function showAuthError(message) {
+        authError.textContent = message;
+        authError.style.display = 'block';
     }
+
+    function authErrorMessage(error) {
+        const code = error && error.code;
+        if (code === 'auth/invalid-phone-number') return 'رقم الجوال غير صحيح. اكتبه مع رمز الدولة مثل +9665XXXXXXXX.';
+        if (code === 'auth/invalid-verification-code') return 'رمز التحقق غير صحيح.';
+        if (code === 'auth/code-expired' || code === 'auth/session-expired') return 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا.';
+        if (code === 'auth/captcha-check-failed') return 'تعذر التحقق من reCAPTCHA. أعد المحاولة.';
+        if (code === 'auth/unauthorized-domain') return 'عنوان الموقع غير مضاف إلى النطاقات المصرح بها في Firebase Authentication.';
+        if (code === 'auth/operation-not-allowed') return 'فعّل Phone في طرق تسجيل الدخول ضمن Firebase Authentication.';
+        if (code === 'auth/quota-exceeded') return 'تم تجاوز حد رسائل SMS المسموح به حاليًا.';
+        if (code === 'auth/too-many-requests') return 'تكررت المحاولات. انتظر قليلًا ثم حاول مجددًا.';
+        if (code === 'auth/network-request-failed') return 'تعذر الاتصال. تحقق من الشبكة وحاول مجددًا.';
+        return 'تعذر إرسال رمز التحقق. تحقق من إعدادات Firebase Authentication ورمز الدولة.';
+    }
+
+    function resetPhoneFlow() {
+        confirmationResult = null;
+        document.getElementById('phoneEntry').hidden = false;
+        document.getElementById('codeEntry').hidden = true;
+        document.getElementById('smsCode').value = '';
+        if (recaptchaVerifier) {
+            try { recaptchaVerifier.clear(); } catch (_) {}
+            recaptchaVerifier = null;
+        }
+        document.getElementById('recaptcha-container').replaceChildren();
+    }
+
+    async function sendSmsCode() {
+        authError.style.display = 'none';
+        const phoneNumber = document.getElementById('phoneNumber').value.trim();
+        if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) {
+            showAuthError('اكتب رقم الجوال بصيغة دولية، مثل +9665XXXXXXXX.');
+            return;
+        }
+
+        const sendButton = document.querySelector('#phoneEntry button[type=\"submit\"]');
+        sendButton.disabled = true;
+        try {
+            if (!recaptchaVerifier) {
+                recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                    size: 'normal'
+                });
+                await recaptchaVerifier.render();
+            }
+            confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifier);
+            document.getElementById('phoneEntry').hidden = true;
+            document.getElementById('codeEntry').hidden = false;
+            document.getElementById('smsCode').focus();
+        } catch (error) {
+            showAuthError(authErrorMessage(error));
+            if (recaptchaVerifier) {
+                try { recaptchaVerifier.clear(); } catch (_) {}
+                recaptchaVerifier = null;
+                document.getElementById('recaptcha-container').replaceChildren();
+            }
+        } finally {
+            sendButton.disabled = false;
+        }
+    }
+
+    async function verifySmsCode() {
+        authError.style.display = 'none';
+        const code = document.getElementById('smsCode').value.trim();
+        if (!confirmationResult || !code) {
+            showAuthError('اكتب رمز التحقق الذي وصلك برسالة SMS.');
+            return;
+        }
+        try {
+            await confirmationResult.confirm(code);
+        } catch (error) {
+            showAuthError(authErrorMessage(error));
+        }
+    }
+
+    document.getElementById('phoneLoginForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (confirmationResult) await verifySmsCode();
+        else await sendSmsCode();
+    });
+
+    document.getElementById('changePhoneButton').addEventListener('click', () => {
+        authError.style.display = 'none';
+        resetPhoneFlow();
+    });
+
+    document.getElementById('signOutButton').addEventListener('click', () => auth.signOut());
 
     function updateDayAndFilter() {
         const now = new Date();
         const dateParts = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Riyadh',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
+            timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit'
         }).formatToParts(now);
         const parts = Object.fromEntries(dateParts.map(({ type, value }) => [type, value]));
         const gregorianDate = `${parts.year}-${parts.month}-${parts.day}`;
         const gregorianDisplay = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
-            timeZone: 'Asia/Riyadh',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
+            timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long', year: 'numeric'
         }).format(now);
         const hijriDisplay = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
-            timeZone: 'Asia/Riyadh',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
+            timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long', year: 'numeric'
         }).format(now);
         const dayDisplay = new Intl.DateTimeFormat('ar-SA', {
-            timeZone: 'Asia/Riyadh',
-            weekday: 'long'
+            timeZone: 'Asia/Riyadh', weekday: 'long'
         }).format(now);
 
         const dateInput = document.getElementById('date');
@@ -442,15 +567,44 @@
         document.getElementById('day').value = dayDisplay;
 
         const obs = document.getElementById('observer').value.trim();
-        if (obs) {
-            localStorage.setItem('observer_name', obs);
+        if (obs && auth.currentUser) {
+            localStorage.setItem(`observer_name_${auth.currentUser.uid}`, obs);
         }
+        renderTodayRecords(currentAttendanceSnapshot);
     }
 
-    updateDayAndFilter();
+    function renderTodayRecords(snapshot) {
+        const tableBody = document.getElementById('myTodayRecords');
+        tableBody.replaceChildren();
+        const currentObserver = document.getElementById('observer').value.trim();
+        const currentDate = document.getElementById('date').dataset.gregorianDate;
+        if (!snapshot || !currentObserver || !currentDate || !auth.currentUser) return;
+
+        snapshot.forEach((childSnapshot) => {
+            const data = childSnapshot.val() || {};
+            if (data.observer !== currentObserver || data.date !== currentDate) return;
+            const row = document.createElement('tr');
+            [data.cell, data.period, data.grade, data.classroom, data.teacher].forEach((value) => {
+                const cell = document.createElement('td');
+                cell.textContent = value || '-';
+                row.appendChild(cell);
+            });
+            const statusCell = document.createElement('td');
+            const status = document.createElement('strong');
+            status.textContent = data.status || '-';
+            statusCell.appendChild(status);
+            row.appendChild(statusCell);
+            tableBody.prepend(row);
+        });
+    }
 
     function saveData() {
+        const user = auth.currentUser;
         const observerName = document.getElementById('observer').value.trim();
+        if (!user || !attendanceRef) {
+            alert('انتهت جلسة الدخول. سجّل الدخول مجددًا.');
+            return;
+        }
         if (!observerName) {
             alert('يرجى إدخال اسم المشرف أولاً');
             return;
@@ -469,39 +623,58 @@
             timestamp: Date.now()
         };
 
-        database.ref('attendance').push(record)
+        attendanceRef.push(record)
             .then(() => {
                 const msg = document.getElementById('successMsg');
                 msg.style.display = 'block';
                 setTimeout(() => { msg.style.display = 'none'; }, 3000);
             })
-            .catch((error) => {
-                alert('خطأ أثناء الحفظ: ' + error.message);
-            });
+            .catch(() => alert('تعذر حفظ البيانات. تحقق من تسجيل الدخول وقواعد قاعدة البيانات.'));
     }
 
-    database.ref('attendance').on('value', (snapshot) => {
-        const tableBody = document.getElementById('myTodayRecords');
-        tableBody.innerHTML = '';
-        
-        const currentObserver = document.getElementById('observer').value.trim();
-        const currentDate = document.getElementById('date').dataset.gregorianDate;
+    auth.onAuthStateChanged(async (user) => {
+        authError.style.display = 'none';
+        if (attendanceRef) attendanceRef.off('value');
+        attendanceRef = null;
+        currentAttendanceSnapshot = null;
+        document.getElementById('myTodayRecords').replaceChildren();
 
-        if (!currentObserver || !currentDate) return;
-
-        snapshot.forEach((childSnapshot) => {
-            const data = childSnapshot.val();
-            if (data.observer === currentObserver && data.date === currentDate) {
-                const row = `<tr>
-                    <td>${data.cell || '-'}</td>
-                    <td>${data.period || '-'}</td>
-                    <td>${data.grade || '-'}</td>
-                    <td>${data.classroom || '-'}</td>
-                    <td>${data.teacher || '-'}</td>
-                    <td><strong>${data.status || '-'}</strong></td>
-                </tr>`;
-                tableBody.innerHTML = row + tableBody.innerHTML;
+        if (!user) {
+            resetPhoneFlow();
+            appContainer.hidden = true;
+            authContainer.hidden = false;
+            if (pendingAuthMessage) {
+                showAuthError(pendingAuthMessage);
+                pendingAuthMessage = '';
             }
+            return;
+        }
+
+        try {
+            const access = await database.ref(`authorizedUsers/${user.uid}`).once('value');
+            if (access.val() !== true) {
+                pendingAuthMessage = 'هذا الرقم غير مصرّح له بعد. أضف UID الحساب إلى authorizedUsers في قاعدة البيانات.';
+                await auth.signOut();
+                return;
+            }
+        } catch (error) {
+            pendingAuthMessage = 'تعذر التحقق من صلاحية الرقم. تحقق من نشر قواعد Realtime Database.';
+            await auth.signOut();
+            return;
+        }
+
+        authContainer.hidden = true;
+        appContainer.hidden = false;
+        document.getElementById('observer').value = localStorage.getItem(`observer_name_${user.uid}`) || '';
+        updateDayAndFilter();
+
+        // كل حساب يقرأ ويكتب سجلاته فقط تحت UID الخاص به.
+        attendanceRef = database.ref(`users/${user.uid}/attendance`);
+        attendanceRef.on('value', (snapshot) => {
+            currentAttendanceSnapshot = snapshot;
+            renderTodayRecords(snapshot);
+        }, () => {
+            alert('تعذر تحميل سجلات هذا الحساب. تحقق من نشر قواعد Realtime Database.');
         });
     });
 </script>

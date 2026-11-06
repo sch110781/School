@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "authorizedUsers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    },
+    "authorizedAdmins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    },
+    "users": {
+      ".read": "auth != null && root.child('authorizedAdmins').child(auth.uid).val() == true",
+      "$uid": {
+        "attendance": {
+          ".read": "auth != null && auth.uid == $uid && root.child('authorizedUsers').child(auth.uid).val() == true",
+          "$recordId": {
+            ".write": "auth != null && ((auth.uid == $uid && root.child('authorizedUsers').child(auth.uid).val() == true) || root.child('authorizedAdmins').child(auth.uid).val() == true)",
+            ".validate": "newData.hasChildren(['date', 'day', 'observer', 'cell', 'period', 'grade', 'classroom', 'teacher', 'status', 'timestamp']) && newData.numChildren() == 10 && newData.child('date').isString() && newData.child('day').isString() && newData.child('observer').isString() && newData.child('cell').isString() && newData.child('period').isString() && newData.child('grade').isString() && newData.child('classroom').isString() && newData.child('teacher').isString() && newData.child('status').isString() && newData.child('timestamp').isNumber()"
+          }
+        }
+      }
+    },
+    "attendance": {
+      ".read": "auth != null && root.child('authorizedAdmins').child(auth.uid).val() == true",
+      "$recordId": {
+        ".write": "auth != null && root.child('authorizedAdmins').child(auth.uid).val() == true && !newData.exists()"
+      }
+    }
+  }
+}
