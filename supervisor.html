@@ -440,22 +440,15 @@
 
 <div id="authContainer" class="container auth-card">
     <h2>دخول المشرف</h2>
-    <form id="phoneLoginForm" autocomplete="on">
-        <div id="phoneEntry">
-            <label for="phoneNumber">رقم الجوال بصيغة دولية:</label>
-            <input type="tel" id="phoneNumber" inputmode="tel" autocomplete="tel" placeholder="+9665XXXXXXXX" required>
-            <div id="recaptcha-container"></div>
-            <button class="auth-submit" type="submit">إرسال رمز SMS</button>
-        </div>
-        <div id="codeEntry" hidden>
-            <label for="smsCode">رمز التحقق المرسل:</label>
-            <input type="text" id="smsCode" inputmode="numeric" autocomplete="one-time-code" required>
-            <button class="auth-submit" type="submit">تحقق ودخول المشرف</button>
-            <button class="auth-secondary" id="changePhoneButton" type="button">استخدام رقم آخر</button>
-        </div>
+    <form id="passwordLoginForm" autocomplete="on">
+        <label for="phoneNumber">رقم الجوال بصيغة دولية:</label>
+        <input type="tel" id="phoneNumber" inputmode="tel" autocomplete="username" placeholder="+9665XXXXXXXX" required>
+        <label for="password">كلمة المرور الخاصة بك:</label>
+        <input type="password" id="password" autocomplete="current-password" minlength="6" required>
+        <button class="auth-submit" type="submit">تسجيل الدخول</button>
     </form>
     <div id="authError" class="auth-error" role="alert"></div>
-    <p class="auth-note">هذه الصفحة للمشرفين المعتمدين فقط. بعد أول تسجيل دخول، أضف UID الحساب إلى authorizedAdmins.</p>
+    <p class="auth-note">يدخل كل مستخدم بكلمة مرور فريدة ينشئها المسؤول يدويًا. لا تستخدم كلمة مرور مشتركة.</p>
 </div>
 
 <div id="adminContent" hidden>
@@ -571,7 +564,7 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "AIzaSyAB4-peSNR8dVd2xj4Kv685dVVsiYk4MiU",
+        apiKey: "PASTE_FIREBASE_WEB_API_KEY_HERE",
         authDomain: "school1-29236.firebaseapp.com",
         databaseURL: "https://school1-29236-default-rtdb.firebaseio.com",
         projectId: "school1-29236",
@@ -595,8 +588,6 @@
     let usersData = {};
     let legacyRef = null;
     let usersRef = null;
-    let confirmationResult = null;
-    let recaptchaVerifier = null;
     let pendingAuthMessage = '';
 
     function showAuthError(message) {
@@ -604,82 +595,47 @@
         authError.style.display = 'block';
     }
 
-    function phoneErrorMessage(error) {
+    function loginErrorMessage(error) {
         const code = error && error.code;
-        if (code === 'auth/invalid-phone-number') return 'رقم الجوال غير صحيح؛ استخدم الصيغة الدولية مثل +9665XXXXXXXX.';
-        if (code === 'auth/invalid-verification-code') return 'رمز التحقق غير صحيح.';
-        if (code === 'auth/code-expired' || code === 'auth/session-expired') return 'انتهت صلاحية الرمز؛ اطلب رمزًا جديدًا.';
-        if (code === 'auth/captcha-check-failed') return 'تعذر التحقق من reCAPTCHA؛ أعد المحاولة.';
-        if (code === 'auth/unauthorized-domain') return 'أضف نطاق الموقع إلى Authorized domains في Firebase Authentication.';
-        if (code === 'auth/operation-not-allowed') return 'فعّل Phone في Firebase Authentication.';
-        if (code === 'auth/quota-exceeded') return 'تم تجاوز حد رسائل SMS المتاح حاليًا.';
+        if (code === 'auth/invalid-email') return 'رقم الجوال غير صحيح؛ استخدم الصيغة الدولية مثل +9665XXXXXXXX.';
+        if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') return 'رقم الجوال أو كلمة المرور غير صحيحة.';
+        if (code === 'auth/user-disabled') return 'هذا الحساب موقوف. تواصل مع المسؤول.';
+        if (code === 'auth/operation-not-allowed') return 'فعّل Email/Password في طرق تسجيل الدخول ضمن Firebase Authentication.';
         if (code === 'auth/too-many-requests') return 'تكررت المحاولات؛ انتظر قليلًا ثم حاول مجددًا.';
-        return 'تعذر إرسال أو تأكيد الرمز؛ راجع إعدادات Phone في Firebase.';
+        if (code === 'auth/network-request-failed') return 'تعذر الاتصال. تحقق من الشبكة وحاول مجددًا.';
+        return 'تعذر تسجيل الدخول. تحقق من رقم الجوال وكلمة المرور.';
     }
 
-    function resetPhoneFlow() {
-        confirmationResult = null;
-        document.getElementById('phoneEntry').hidden = false;
-        document.getElementById('codeEntry').hidden = true;
-        document.getElementById('smsCode').value = '';
-        if (recaptchaVerifier) {
-            try { recaptchaVerifier.clear(); } catch (_) {}
-            recaptchaVerifier = null;
-        }
-        document.getElementById('recaptcha-container').replaceChildren();
+    function firebaseEmailForPhone(phoneNumber) {
+        const digits = phoneNumber.replace(/\D/g, '');
+        return 'u' + digits + '@school1-29236.firebaseapp.com';
     }
 
-    async function sendSmsCode() {
+    async function signInWithPassword(event) {
+        event.preventDefault();
         authError.style.display = 'none';
         const phoneNumber = document.getElementById('phoneNumber').value.trim();
-        const digits = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : '';
-        if (digits.length < 8 || digits.length > 15 || !Array.from(digits).every(ch => ch >= '0' && ch <= '9')) {
-            showAuthError('اكتب الرقم بصيغة دولية مثل +9665XXXXXXXX.');
+        if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) {
+            showAuthError('اكتب رقم الجوال بصيغة دولية مثل +9665XXXXXXXX.');
             return;
         }
-
-        const button = document.querySelector('#phoneEntry button[type=submit]');
+        const password = document.getElementById('password').value;
+        if (!password) {
+            showAuthError('اكتب كلمة المرور الخاصة بك.');
+            return;
+        }
+        const button = document.querySelector('#passwordLoginForm button[type=submit]');
         button.disabled = true;
         try {
-            if (!recaptchaVerifier) {
-                recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'normal' });
-                await recaptchaVerifier.render();
-            }
-            confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifier);
-            document.getElementById('phoneEntry').hidden = true;
-            document.getElementById('codeEntry').hidden = false;
-            document.getElementById('smsCode').focus();
+            await auth.signInWithEmailAndPassword(firebaseEmailForPhone(phoneNumber), password);
         } catch (error) {
-            showAuthError(phoneErrorMessage(error));
-            resetPhoneFlow();
+            showAuthError(loginErrorMessage(error));
         } finally {
             button.disabled = false;
         }
     }
 
-    async function verifySmsCode() {
-        authError.style.display = 'none';
-        const code = document.getElementById('smsCode').value.trim();
-        if (!confirmationResult || !code) {
-            showAuthError('اكتب رمز التحقق المرسل برسالة SMS.');
-            return;
-        }
-        try {
-            await confirmationResult.confirm(code);
-        } catch (error) {
-            showAuthError(phoneErrorMessage(error));
-        }
-    }
-
-    document.getElementById('phoneLoginForm').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (confirmationResult) await verifySmsCode();
-        else await sendSmsCode();
-    });
-    document.getElementById('changePhoneButton').addEventListener('click', () => {
-        authError.style.display = 'none';
-        resetPhoneFlow();
-    });
+    document.getElementById('passwordLoginForm').addEventListener('submit', signInWithPassword);
     document.getElementById('supervisorSignOut').addEventListener('click', () => auth.signOut());
 
     function rebuildRawData() {
@@ -729,7 +685,6 @@
         if (!user) {
             adminContent.hidden = true;
             authContainer.hidden = false;
-            resetPhoneFlow();
             if (pendingAuthMessage) {
                 showAuthError(pendingAuthMessage);
                 pendingAuthMessage = '';
